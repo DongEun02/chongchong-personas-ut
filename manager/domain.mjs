@@ -6,18 +6,36 @@ export const TASKS = [
 ];
 export function ensure(ok, message) { if (!ok) throw new Error(message); }
 export function safeId(id) { return typeof id==='string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(id); }
+export const CONDITION_FIELDS = ['webProficiency','similarServiceExperience','priorExperienceWithTargetService'];
+export function validateSelectedPersonas(data, personaIds) {
+  const selected = [...new Set(personaIds)].map(id => {
+    const persona = data.personas.find(p => p.personaId === id);
+    ensure(persona, `${id}: 페르소나를 찾을 수 없습니다.`);
+    return persona;
+  });
+  const missing = selected.flatMap(p => CONDITION_FIELDS.filter(k => typeof p.experimentalConditions?.[k] !== 'string' || !p.experimentalConditions[k].trim()).map(k => `${p.personaId}: experimentalConditions.${k}`));
+  ensure(!missing.length, `실행 조건이 누락되었습니다: ${missing.join(', ')}`);
+  return selected;
+}
 export function validatePersonas(data) {
   ensure(data && data.dataset && Array.isArray(data.personas),'dataset과 personas 배열이 필요합니다.');
   const ids=new Set(), uuids=new Set();
   for(const p of data.personas) {
     ensure(safeId(p.personaId) && !ids.has(p.personaId),'personaId는 중복 없는 영문·숫자·하이픈·밑줄이어야 합니다.'); ids.add(p.personaId);
-    ensure(p.source && p.experimentalConditions,'source와 experimentalConditions가 필요합니다.');
+    ensure(p.source,`${p.personaId}: source가 필요합니다.`);
+    ensure(p.experimentalConditions == null || (typeof p.experimentalConditions === 'object' && !Array.isArray(p.experimentalConditions)),`${p.personaId}: experimentalConditions는 객체 또는 null이어야 합니다.`);
     for(const k of ['uuid','occupation','persona','professional_persona','skills_and_expertise','hobbies_and_interests']) ensure(typeof p.source[k]==='string' && p.source[k].trim(),`source.${k}가 필요합니다.`);
     ensure(Number.isInteger(p.source.age),'source.age는 원본 정수여야 합니다.');
     ensure(!uuids.has(p.source.uuid),'중복 UUID입니다.'); uuids.add(p.source.uuid);
-    for(const k of ['webProficiency','similarServiceExperience','priorExperienceWithTargetService']) ensure(typeof p.experimentalConditions[k]==='string' && p.experimentalConditions[k].trim(),`${k} 실험 조건이 필요합니다.`);
+    for(const k of CONDITION_FIELDS) {
+      const value = p.experimentalConditions?.[k];
+      ensure(value == null || (typeof value === 'string' && value.trim()),`${p.personaId}: experimentalConditions.${k}는 null 또는 비어 있지 않은 문자열이어야 합니다.`);
+    }
   }
-  if(data.personas.length) ensure(typeof data.dataset.revision==='string' && data.dataset.revision.trim() && typeof data.dataset.selectedAt==='string' && Number.isFinite(Date.parse(data.dataset.selectedAt)),'선정 리비전과 selectedAt을 기록해주세요.');
+  if(data.personas.length) {
+    ensure(data.dataset.revision === null || (typeof data.dataset.revision === 'string' && data.dataset.revision.trim()),'dataset.revision은 미확정 null 또는 비어 있지 않은 문자열이어야 합니다.');
+    ensure(typeof data.dataset.selectedAt==='string' && Number.isFinite(Date.parse(data.dataset.selectedAt)),'dataset.selectedAt에 실제 선정 시각을 기록해주세요.');
+  }
   return data;
 }
 export function validateResult(r) {
@@ -68,4 +86,23 @@ export function aggregate(rows) {
  const paired=[];
  for(const b of success.filter(r=>r.version==='B')) {const a=success.find(r=>r.version==='A'&&r.personaId===b.personaId&&r.taskId===b.taskId&&r.repeat===b.repeat);if(a && a.timing.elapsedMs!==null && b.timing.elapsedMs!==null)paired.push({...b,delta:b.timing.elapsedMs-a.timing.elapsedMs});}
  return {attempts:rows.length,valid:valid.length,invalid:rows.filter(r=>r.status==='invalid').length,success:success.length,successRate:personaMean(valid,r=>r.success?1:0),time:personaMean(success,r=>r.timing.elapsedMs),actions:personaMean(valid,r=>r.behavior.actionCount),unnecessary:personaMean(valid,r=>r.behavior.unnecessaryActionCount),ease:personaMean(valid,r=>r.aiEvaluation.easeScore),paired:personaMean(paired,r=>r.delta)};
+}
+
+export function createQueuedRuns(source, data, previousQueue = [], existing = []) {
+  validatePersonas(source);
+  ensure(Array.isArray(data.personaIds)&&data.personaIds.length&&Array.isArray(data.taskIds)&&data.taskIds.length,'페르소나와 TASK를 선택해주세요.');
+  ensure(['current','A','B'].includes(data.version),'버전 오류');
+  ensure(Number.isInteger(data.repeat)&&data.repeat>=1&&data.repeat<=10,'반복 차수는 1~10입니다.');
+  ensure(typeof data.serviceCommit==='string'&&data.serviceCommit.length<=100,'커밋 입력 오류');
+  if(data.taskIds.includes('T01'))ensure(typeof data.referenceTime==='string'&&/([+-]\d{2}:\d{2}|Z)$/.test(data.referenceTime)&&Number.isFinite(Date.parse(data.referenceTime)),'T01의 오프셋 포함 기준 시각을 입력해주세요.');
+  validateSelectedPersonas(source,data.personaIds);
+  const q=[...previousQueue];
+  let added=0;
+  for(const pid of new Set(data.personaIds))for(const tid of new Set(data.taskIds)){
+   const p=source.personas.find(p=>p.personaId===pid),t=TASKS.find(t=>t.id===tid);ensure(p&&t,'존재하지 않는 페르소나 또는 TASK입니다.');
+   ensure(![...q.filter(x=>!existing.some(r=>r.runId===x.runId&&r.status==='invalid')),...existing.filter(r=>r.status!=='invalid')].some(r=>r.personaId===pid&&r.taskId===tid&&r.version===data.version&&r.repeat===data.repeat),'동일 조건이 이미 있습니다. 기존 대기를 확인해주세요. 유효한 반복은 다음 차수를 사용하고 실험 오류 재실행은 동일 차수로 생성할 수 있습니다.');
+   const runId=`ut-${Date.now()}-${globalThis.crypto.randomUUID().slice(0,8)}`;
+   q.push({runId,personaId:pid,taskId:tid,version:data.version,repeat:data.repeat,serviceCommit:data.serviceCommit||null,referenceTime:data.referenceTime||null,createdAt:new Date().toISOString(),promptDelivered:makePrompt(p,t,data.referenceTime)});added++;
+  }
+  return {queue:q, added};
 }

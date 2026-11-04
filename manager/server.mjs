@@ -1,9 +1,9 @@
 import http from 'node:http';
 import {readFile,writeFile,mkdir,readdir,rename,rm} from 'node:fs/promises';
-import {resolve,join,dirname,extname,relative} from 'node:path';
+import {resolve,join,dirname,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
-import {TASKS,ensure,safeId,validatePersonas,validateResult,makePrompt,csvExport} from './domain.mjs';
+import {TASKS,ensure,safeId,validatePersonas,createQueuedRuns,validateResult,csvExport} from './domain.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const publicDir=join(root,'manager/public'), stateDir=join(root,'.ai-ut');
 const port=Number(process.env.PORT||4310), host='127.0.0.1';
@@ -44,20 +44,7 @@ async function handle(req,res){try{
   await writeFile(join(root,'personas.json'),JSON.stringify(data,null,2)+'\n');return send(res,200,{ok:true});
  }
  if(path==='/api/queue'){
-  const source=validatePersonas(await jsonFile(join(root,'personas.json')));
-  ensure(Array.isArray(data.personaIds)&&data.personaIds.length&&Array.isArray(data.taskIds)&&data.taskIds.length,'페르소나와 TASK를 선택해주세요.');
-  ensure(['current','A','B'].includes(data.version),'버전 오류');
-  ensure(Number.isInteger(data.repeat)&&data.repeat>=1&&data.repeat<=10,'반복 차수는 1~10입니다.');
-  ensure(typeof data.serviceCommit==='string'&&data.serviceCommit.length<=100,'커밋 입력 오류');
-  if(data.taskIds.includes('T01'))ensure(typeof data.referenceTime==='string'&&/([+-]\d{2}:\d{2}|Z)$/.test(data.referenceTime)&&Number.isFinite(Date.parse(data.referenceTime)),'T01의 오프셋 포함 기준 시각을 입력해주세요.');
-  const q=await queue(), existing=(await results()).rows;
-  let added=0;
-  for(const pid of new Set(data.personaIds))for(const tid of new Set(data.taskIds)){
-   const p=source.personas.find(p=>p.personaId===pid),t=TASKS.find(t=>t.id===tid);ensure(p&&t,'존재하지 않는 페르소나 또는 TASK입니다.');
-   ensure(![...q.filter(x=>!existing.some(r=>r.runId===x.runId&&r.status==='invalid')),...existing.filter(r=>r.status!=='invalid')].some(r=>r.personaId===pid&&r.taskId===tid&&r.version===data.version&&r.repeat===data.repeat),'동일 조건이 이미 있습니다. 기존 대기를 확인해주세요. 유효한 반복은 다음 차수를 사용하고 실험 오류 재실행은 동일 차수로 생성할 수 있습니다.');
-   const runId=`ut-${Date.now()}-${randomUUID().slice(0,8)}`;
-   q.push({runId,personaId:pid,taskId:tid,version:data.version,repeat:data.repeat,serviceCommit:data.serviceCommit||null,referenceTime:data.referenceTime||null,createdAt:new Date().toISOString(),promptDelivered:makePrompt(p,t,data.referenceTime)});added++;
-  }
+  const {queue:q,added}=createQueuedRuns(await jsonFile(join(root,'personas.json')),data,await queue(),(await results()).rows);
   await saveQueue(q);return send(res,200,{added});
  }
  if(path==='/api/queue/remove'){

@@ -23,3 +23,46 @@ test('실제 양식 구조는 상태·대기 시간·점수 불일치를 거부�
  assert.throws(()=>validateResult({...r,aiEvaluation:{easeScore:6,reason:null}}));
  assert.throws(()=>validateResult({...r,timing:{...r.timing,elapsedMs:-1}}));
 });
+
+async function selectedSource() {
+ const {readFile}=await import('node:fs/promises');
+ return JSON.parse(await readFile(new URL('../personas.json',import.meta.url),'utf8'));
+}
+
+test('가져오기는 개별 조건 null과 experimentalConditions 전체 null을 보존한다',async()=>{
+ const data=await selectedSource();
+ data.personas[0].experimentalConditions={webProficiency:null,similarServiceExperience:null,priorExperienceWithTargetService:null};
+ data.personas[1].experimentalConditions=null;
+ const before=structuredClone(data);
+ assert.doesNotThrow(()=>validatePersonas(data));
+ assert.deepEqual(data,before);
+});
+
+test('선택하지 않은 27명의 null은 P01~P03 T02 대기 생성을 막지 않는다',async()=>{
+ const {createQueuedRuns}=await import('./domain.mjs');
+ const data=await selectedSource();
+ for(const p of data.personas)if(!['P01','P02','P03'].includes(p.personaId))p.experimentalConditions=null;
+ const before=structuredClone(data);
+ const {queue,added}=createQueuedRuns(data,{personaIds:['P01','P02','P03'],taskIds:['T02'],version:'current',repeat:1,serviceCommit:'',referenceTime:''});
+ assert.equal(added,3);
+ assert.deepEqual(queue.map(r=>[r.personaId,r.taskId,r.version,r.repeat]),[['P01','T02','current',1],['P02','T02','current',1],['P03','T02','current',1]]);
+ for(const r of queue){assert.match(r.promptDelivered,/연구자가 별도로 부여한 실험 조건/);assert.match(r.promptDelivered,/"webProficiency": "중간"/);}
+ assert.deepEqual(data,before);
+});
+
+test('선택한 페르소나의 누락 조건은 personaId와 모든 필드명을 안내한다',async()=>{
+ const {createQueuedRuns}=await import('./domain.mjs');
+ const data=await selectedSource();
+ data.personas.find(p=>p.personaId==='P02').experimentalConditions=null;
+ assert.throws(()=>createQueuedRuns(data,{personaIds:['P01','P02','P03'],taskIds:['T02'],version:'current',repeat:1,serviceCommit:'',referenceTime:''}),error=>{
+  for(const field of ['webProficiency','similarServiceExperience','priorExperienceWithTargetService'])assert.ok(error.message.includes(`P02: experimentalConditions.${field}`));
+  assert.ok(!error.message.includes('P01:'));return true;
+ });
+});
+
+test('승인한 30명 모두 T02 current 1차 대기를 만들 수 있다',async()=>{
+ const {createQueuedRuns}=await import('./domain.mjs');
+ const data=await selectedSource();
+ const {queue,added}=createQueuedRuns(data,{personaIds:data.personas.map(p=>p.personaId),taskIds:['T02'],version:'current',repeat:1,serviceCommit:'',referenceTime:''});
+ assert.equal(added,30);assert.equal(new Set(queue.map(r=>r.runId)).size,30);
+});

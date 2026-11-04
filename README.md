@@ -214,3 +214,7 @@ summary.csv는 실행별 1행이며 JSON의 runId→run_id, personaId→persona_
 ## 로컬 관리 사이트
 
 Node.js 22 이상에서 `npm start` 후 http://127.0.0.1:4310 을 열면 페르소나 등록, 실행 대기 목록, Aside용 지시문 복사, 결과·캡처 가져오기와 집계를 사용할 수 있다. 별도 의존성 설치나 모델 API 키는 필요 없다. 실제 AI 실행은 Aside에 별도로 요청한다. 자세한 사용법·저장 위치·집계 범위는 [관리 사이트 안내](manager/README.md)를 따른다. 기존 실험 양식과 초기 빈 데이터는 유지한다.
+
+### 현재 승인된 실험 조건 (2026-11-04)
+
+사용자 승인에 따라 P01~P30 전체의 webProficiency는 ‘중간’, similarServiceExperience와 priorExperienceWithTargetService는 ‘없음’으로 설정했다. 이는 원본 사실이 아니라 연구자가 부여한 가상 실험 조건이다. dataset 및 source는 변경하지 않았다. 앞서 제안한 웹 숙련도별 각 10명 배분 대신, 현재는 30명 모두 동일한 조건을 사용한다. 따라서 숙련도 조건별 차이를 검증하는 설계는 아니다.
