@@ -73,3 +73,14 @@ test('활성 TASK는 T01·T02·T04이며 T03 대기를 새로 만들 수 없다'
  const data=await selectedSource();
  assert.throws(()=>createQueuedRuns(data,{personaIds:['P01'],taskIds:['T03'],version:'current',repeat:1,serviceCommit:'',referenceTime:''}),/T03은 제외/);
 });
+
+test('T02 지시문은 사용자 지정 제출 상세 URL에서 시작하도록 안내한다',async()=>{
+ const {TASKS,makePrompt}=await import('./domain.mjs');
+ const t=TASKS.find(t=>t.id==='T02');
+ assert.equal(t.startUrl,'https://chongchong.kr/studies/78/assignments/85/submissions/248');
+ const data=await selectedSource();
+ const prompt=makePrompt(data.personas[0],t);
+ assert.ok(prompt.includes(`시작 URL: ${t.startUrl}`));
+ assert.ok(prompt.includes('시작 화면 준비 시간은 수행 시간에서 제외'));
+ assert.ok(prompt.includes('내가 가입한 스터디들을 한 번에 볼 수 있는 화면'));
+});

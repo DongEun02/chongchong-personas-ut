@@ -62,7 +62,7 @@ if(name==='remove-queue'){if(!confirm('이 대기를 취소할까요? 실제 실
 if(name==='import-results')return resultImport();
 if(name==='result-detail')return resultDetail(id);
 if(name==='persona-detail'){const p=state.personas.personas.find(p=>p.personaId===id);return modal(`${p.personaId} · 원문과 실험 조건`,`<h3>데이터셋 원문</h3><pre>${esc(JSON.stringify(p.source,null,2))}</pre><h3>연구자가 부여한 조건</h3><pre>${esc(JSON.stringify(p.experimentalConditions,null,2))}</pre>`);}
-if(name==='task-detail'){const t=TASKS.find(t=>t.id===id);return modal(`${t.id} · ${t.title}`,`<span class="badge">${t.role}</span><p class="help">실행자 전달 목표</p><pre>${esc(t.goal.replace('{referenceTime}','[확정한 기준 시각]'))}</pre><p>시작 화면·테스트 계정·정답 데이터·초기화는 검증자가 실행 전에 준비해야 합니다.</p><p class="help">제한 제안: ${t.limit} · 실측값 아님</p>${button('task-doc','검증자용 상세 프로토콜 열기',true)}`);}
+if(name==='task-detail'){const t=TASKS.find(t=>t.id===id);return modal(`${t.id} · ${t.title}`,`<span class="badge">${t.role}</span><p class="help">${t.startUrl?`시작 URL: ${esc(t.startUrl)}<br>`:''}실행자 전달 목표</p><pre>${esc(t.goal.replace('{referenceTime}','[확정한 기준 시각]'))}</pre><p>시작 화면·테스트 계정·정답 데이터·초기화는 검증자가 실행 전에 준비해야 합니다.</p><p class="help">제한 제안: ${t.limit} · 실측값 아님</p>${button('task-doc','검증자용 상세 프로토콜 열기',true)}`);}
 }
 async function fetchTemplate(){const response=await fetch('/api/template');if(!response.ok)throw new Error('기록 양식을 읽지 못했습니다.');return response.json();}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(b)Promise.resolve(action(b.dataset.action,b.dataset.id)).catch(err=>toast(err.message,true));});

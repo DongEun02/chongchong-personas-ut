@@ -1,6 +1,6 @@
 export const TASKS = [
   {id:'T01',title:'마감 임박 과제 찾기',role:'멤버',tag:'정보 발견',limit:'8분 · 60행동',goal:'기준 시각은 {referenceTime}, 시간대는 Asia/Seoul입니다. 기준 시각부터 72시간 이내에 마감되는, 내가 해야 하는 미제출 과제를 모두 찾아 제목과 마감 시각을 알려주세요. 과제를 제출하거나 수정할 필요는 없습니다.'},
-  {id:'T02',title:'내 스터디 목록으로 이동',role:'멤버',tag:'탐색 경로',limit:'5분 · 40행동',goal:'현재 보고 있는 스터디에서 나와, 내가 가입한 스터디들을 한 번에 볼 수 있는 화면으로 이동해주세요.'},
+  {id:'T02',startUrl:'https://chongchong.kr/studies/78/assignments/85/submissions/248',title:'내 스터디 목록으로 이동',role:'멤버',tag:'탐색 경로',limit:'5분 · 40행동',goal:'현재 보고 있는 스터디에서 나와, 내가 가입한 스터디들을 한 번에 볼 수 있는 화면으로 이동해주세요.'},
   {id:'T04',title:'기존 과제에 신규 멤버 포함',role:'운영자',tag:'멤버 관리',limit:'능동 15분 · 100행동',goal:'과제를 하나 만든 다음 새 멤버에게 초대 링크를 전달해주세요. 그 멤버가 가입하면, 방금 만든 기존 과제의 대상자에 포함해주세요. 기존 과제는 유지해주세요.'}
 ];
 // Retained only for reading historical records; excluded from new queues/imports.
@@ -68,7 +68,7 @@ export function validateResult(r) {
   return r;
 }
 export function makePrompt(persona,task,referenceTime) {
-  return `이것은 실제 사용자 UT가 아닌 AI 모의 UT입니다.\n새 대화와 분리된 브라우저 세션에서 준비된 시작 화면을 확인한 뒤 진행하세요. 이전 실행의 경로·결과를 사용하지 마세요. 준비가 안 되었으면 실행하지 말고 부족한 항목을 알려주세요.\n\n페르소나 원문:\n${JSON.stringify(persona.source,null,2)}\n\n연구자가 별도로 부여한 실험 조건:\n${JSON.stringify(persona.experimentalConditions,null,2)}\n\n역할: ${task.role}\n목표: ${task.goal.replace('{referenceTime}',referenceTime||'미확정')}\n제한(파일럿 제안, 실행 전 확정 필요): ${task.limit}\n\n허용 조작: 클릭, 입력, 스크롤, 링크 열기, 뒤로가기 등 정상 브라우저 조작. 관찰 가능한 행동과 화면 근거만 기록하고 내부 사고 과정은 기록하지 마세요. 비밀번호·쿠키·토큰·초대 링크 원문은 결과에 저장하지 마세요. 시간은 인간의 사용 시간이 아닌 AI 경과 시간입니다. 성공 여부는 종료 후 검증자가 독립적으로 확인합니다.\n종료 후 질문: 이번 목표를 수행하는 과정은 얼마나 쉬웠나요? 1점 매우 어려움 ~ 5점 매우 쉬움. 실제 화면이나 행동을 근거로 짧게 설명해주세요.`;
+  return `이것은 실제 사용자 UT가 아닌 AI 모의 UT입니다.\n새 대화와 분리된 브라우저 세션에서 준비된 시작 화면을 확인한 뒤 진행하세요. 이전 실행의 경로·결과를 사용하지 마세요. 준비가 안 되었으면 실행하지 말고 부족한 항목을 알려주세요.\n\n페르소나 원문:\n${JSON.stringify(persona.source,null,2)}\n\n연구자가 별도로 부여한 실험 조건:\n${JSON.stringify(persona.experimentalConditions,null,2)}\n\n역할: ${task.role}\n${task.startUrl?`시작 URL: ${task.startUrl}\n검증자가 로그인·권한을 확인하고 이 제출 상세 화면을 열어 준비한 뒤 목표 수행을 시작합니다. 시작 화면 준비 시간은 수행 시간에서 제외합니다.\n`:''}목표: ${task.goal.replace('{referenceTime}',referenceTime||'미확정')}\n제한(파일럿 제안, 실행 전 확정 필요): ${task.limit}\n\n허용 조작: 클릭, 입력, 스크롤, 링크 열기, 뒤로가기 등 정상 브라우저 조작. 관찰 가능한 행동과 화면 근거만 기록하고 내부 사고 과정은 기록하지 마세요. 비밀번호·쿠키·토큰·초대 링크 원문은 결과에 저장하지 마세요. 시간은 인간의 사용 시간이 아닌 AI 경과 시간입니다. 성공 여부는 종료 후 검증자가 독립적으로 확인합니다.\n종료 후 질문: 이번 목표를 수행하는 과정은 얼마나 쉬웠나요? 1점 매우 어려움 ~ 5점 매우 쉬움. 실제 화면이나 행동을 근거로 짧게 설명해주세요.`;
 }
 export const CSV_HEADER='run_id,persona_id,task_id,version,repeat,status,success,elapsed_sec,model_tool_wait_sec,external_wait_sec,action_count,unnecessary_action_count,ai_ease_score,failure_category,evidence_path';
 export function csvExport(results) {
