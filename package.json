@@ -1,0 +1,10 @@
+{
+  "name": "chongchong-ai-ut-manager",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node manager/server.mjs",
+    "test": "node --test manager/domain.test.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

@@ -1,0 +1,10 @@
+{
+  "dataset": {
+    "name": "NVIDIA Nemotron-Personas-Korea",
+    "url": "https://huggingface.co/datasets/nvidia/Nemotron-Personas-Korea",
+    "revision": null,
+    "selectedAt": null,
+    "selectionCriteria": "미선정. README.md의 페르소나 선정 절차에 따라 고정 리비전, 후보 범위, 추출 규칙, 조건 배정과 변경 여부를 기록한다. 출처: NVIDIA; CC BY 4.0."
+  },
+  "personas": []
+}

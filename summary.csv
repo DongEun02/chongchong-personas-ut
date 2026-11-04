@@ -1,0 +1,1 @@
+run_id,persona_id,task_id,version,repeat,status,success,elapsed_sec,model_tool_wait_sec,external_wait_sec,action_count,unnecessary_action_count,ai_ease_score,failure_category,evidence_path

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Chongchong · AI UT Lab</title><meta name="description" content="AI 모의 사용성 실험의 준비, 대기 목록, 결과를 관리하는 로컬 워크스페이스"><link rel="stylesheet" href="/styles.css"><script type="module" src="/app.js"></script></head>
+<body>
+<div class="app-shell">
+<aside class="sidebar"><a class="brand" href="#overview"><span class="brand-symbol">c<span>•</span></span><span>chongchong<small>AI UT LAB</small></span></a>
+<div class="workspace-label">실험 워크스페이스</div>
+<nav aria-label="주 메뉴"><a href="#overview" data-page="overview"><span>◫</span>실험 개요</a><a href="#queue" data-page="queue"><span>≡</span>실행 대기 목록 <b id="queue-count">0</b></a><a href="#personas" data-page="personas"><span>◎</span>페르소나</a><a href="#tasks" data-page="tasks"><span>⊞</span>TASK 라이브러리</a><a href="#results" data-page="results"><span>▥</span>실험 결과</a></nav>
+<div class="sidebar-bottom"><div class="local-tag"><i></i> 로컬 워크스페이스</div><p>준비는 여기서,<br>실행은 Aside에서.</p><button class="text-button" id="protocol-button">실험 프로토콜 ↗</button></div>
+</aside>
+<div class="main-shell"><header class="topbar"><div><span class="breadcrumb">WORKSPACE</span><span class="slash">/</span><span id="page-name">실험 개요</span></div><span class="badge">AI 모의 UT</span></header><main id="main" tabindex="-1"></main><footer><span>CHONGCHONG · PERSONA USABILITY LAB</span><span>합성 페르소나 기반 실험 · 실제 사용자 UT와 구분합니다.</span></footer></div>
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+<dialog id="dialog"><div class="dialog-head"><h2 id="dialog-title"></h2><button id="close-dialog" class="icon-button" aria-label="닫기">×</button></div><div id="dialog-body"></div></dialog>
+<input id="persona-file" type="file" accept="application/json,.json" hidden>
+</body></html>

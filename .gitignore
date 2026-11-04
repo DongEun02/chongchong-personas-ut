@@ -1,0 +1,39 @@
+# 환경 설정·인증정보 (.env.example은 추적 가능)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+cookies.json
+cookies*.json
+*.cookies
+storageState*.json
+storage-state*.json
+.auth/
+auth/
+credentials/
+secrets/
+*token*.json
+# 로컬 브라우저 세션·프로필
+browser-profile*/
+chrome-profile*/
+user-data-dir/
+login-state*/
+session-state*/
+playwright/.auth/
+# 로컬 의존성·캐시
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.cache/
+.pytest_cache/
+.DS_Store
+# 원본 캡처 제외. 커밋 전 내용 검토도 필요
+raw-captures/
+
+# 로컬 실험 대기 목록·페르소나 백업
+.ai-ut/
