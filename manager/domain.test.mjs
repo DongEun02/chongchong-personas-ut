@@ -66,3 +66,10 @@ test('승인한 30명 모두 T02 current 1차 대기를 만들 수 있다',async
  const {queue,added}=createQueuedRuns(data,{personaIds:data.personas.map(p=>p.personaId),taskIds:['T02'],version:'current',repeat:1,serviceCommit:'',referenceTime:''});
  assert.equal(added,30);assert.equal(new Set(queue.map(r=>r.runId)).size,30);
 });
+
+test('활성 TASK는 T01·T02·T04이며 T03 대기를 새로 만들 수 없다',async()=>{
+ const {TASKS,createQueuedRuns}=await import('./domain.mjs');
+ assert.deepEqual(TASKS.map(t=>t.id),['T01','T02','T04']);
+ const data=await selectedSource();
+ assert.throws(()=>createQueuedRuns(data,{personaIds:['P01'],taskIds:['T03'],version:'current',repeat:1,serviceCommit:'',referenceTime:''}),/T03은 제외/);
+});

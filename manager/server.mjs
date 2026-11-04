@@ -3,6 +3,7 @@ import {readFile,writeFile,mkdir,readdir,rename,rm} from 'node:fs/promises';
 import {resolve,join,dirname,extname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
+import {readRuns,destinationForImport,findRunDirectory} from './storage.mjs';
 import {TASKS,ensure,safeId,validatePersonas,createQueuedRuns,validateResult,csvExport} from './domain.mjs';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const publicDir=join(root,'manager/public'), stateDir=join(root,'.ai-ut');
@@ -10,7 +11,7 @@ const port=Number(process.env.PORT||4310), host='127.0.0.1';
 const jsonFile=async path=>JSON.parse(await readFile(path,'utf8'));
 async function queue(){try{return await jsonFile(join(stateDir,'queue.json'));}catch(e){if(e.code==='ENOENT')return [];throw e;}}
 async function saveQueue(q){await mkdir(stateDir,{recursive:true});const temp=join(stateDir,`queue-${randomUUID()}.tmp`);await writeFile(temp,JSON.stringify(q,null,2)+'\n');await rename(temp,join(stateDir,'queue.json'));}
-async function results(){const rows=[],warnings=[];for(const entry of await readdir(join(root,'runs'),{withFileTypes:true})){if(!entry.isDirectory() || !safeId(entry.name))continue;try{const r=validateResult(await jsonFile(join(root,'runs',entry.name,'result.json')));ensure(r.runId===entry.name,'디렉터리와 runId 불일치');rows.push(r);}catch(e){warnings.push(`${entry.name}: ${e.message}`);}}return {rows,warnings};}
+async function results(){return readRuns(root);}
 function send(res,status,data,type='application/json; charset=utf-8'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'",'Referrer-Policy':'no-referrer'});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}
 async function body(req){let size=0,chunks=[];for await(const c of req){size+=c.length;ensure(size<=24*1024*1024,'요청은 24MB 이하여야 합니다.');chunks.push(c);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
 let mutation=Promise.resolve();
@@ -20,15 +21,15 @@ async function handle(req,res){try{
  const origin=req.headers.origin;if(origin)ensure([`http://${host}:${port}`,`http://localhost:${port}`].includes(origin),'다른 사이트의 요청은 허용하지 않습니다.');
  const url=new URL(req.url,`http://${host}:${port}`), path=url.pathname;
  if(req.method==='GET'){
-  if(path==='/api/actions'){const id=url.searchParams.get('runId');ensure(safeId(id),'runId 오류');return send(res,200,await jsonFile(join(root,'runs',id,'actions.json')));}
+  if(path==='/api/actions'){const id=url.searchParams.get('runId');ensure(safeId(id),'runId 오류');return send(res,200,await jsonFile(join(await findRunDirectory(root,id),'actions.json')));}
   if(path==='/api/template')return send(res,200,await jsonFile(join(root,'templates/result.json')));
-  if(path==='/api/state'){const r=await results();return send(res,200,{personas:await jsonFile(join(root,'personas.json')),tasks:TASKS,queue:await queue(),results:r.rows,warnings:r.warnings});}
+  if(path==='/api/state'){const r=await results();return send(res,200,{personas:await jsonFile(join(root,'personas.json')),tasks:TASKS,queue:(await queue()).filter(q=>TASKS.some(t=>t.id===q.taskId)),results:r.rows,warnings:r.warnings});}
   if(path==='/api/summary.csv'){const {rows}=await results();return send(res,200,csvExport(rows),'text/csv; charset=utf-8');}
   if(path==='/api/docs'){ensure(['README.md','tasks.md'].includes(url.searchParams.get('file')),'문서 경로 오류');return send(res,200,await readFile(join(root,url.searchParams.get('file')),'utf8'),'text/plain; charset=utf-8');}
   if(path==='/domain.mjs')return send(res,200,await readFile(join(root,'manager/domain.mjs')),'text/javascript; charset=utf-8');
   if(path.startsWith('/evidence/')){
    const parts=decodeURIComponent(path).split('/').slice(2);ensure(parts.length===2&&safeId(parts[0])&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,120}\.(png|jpg|jpeg|webp)$/i.test(parts[1]),'캡처 경로 오류');
-   const bytes=await readFile(join(root,'runs',...parts));return send(res,200,bytes,{'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','webp':'image/webp'}[extname(parts[1]).slice(1).toLowerCase()]);
+   const bytes=await readFile(join(await findRunDirectory(root,parts[0]),parts[1]));return send(res,200,bytes,{'png':'image/png','jpg':'image/jpeg','jpeg':'image/jpeg','webp':'image/webp'}[extname(parts[1]).slice(1).toLowerCase()]);
   }
   const assets={'/':'index.html','/app.js':'app.js','/styles.css':'styles.css'};
   if(assets[path])return send(res,200,await readFile(join(publicDir,assets[path])),path.endsWith('.js')?'text/javascript; charset=utf-8':path.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8');
@@ -52,6 +53,7 @@ async function handle(req,res){try{
  }
  if(path==='/api/import'){
   const r=validateResult(data.result);
+  ensure(TASKS.some(t=>t.id===r.taskId),'실험 대상에서 제외된 TASK의 결과는 새로 가져올 수 없습니다.');
   ensure(!(await results()).rows.some(x=>x.status!=='invalid' && r.status!=='invalid' && ['personaId','taskId','version','repeat'].every(k=>x[k]===r[k])),'동일 조건의 유효 결과가 이미 있습니다. 반복 차수 또는 원본을 확인해주세요.');
   const q=await queue();const planned=q.find(x=>x.runId===r.runId);
   if(planned)for(const key of ['personaId','taskId','version','repeat'])ensure(planned[key]===r[key],`대기 목록과 ${key}가 다릅니다.`);
@@ -72,11 +74,9 @@ async function handle(req,res){try{
   });
   for(const file of r.verification.evidenceFiles)ensure(names.has(file),'evidenceFiles는 함께 선택한 캡처의 파일명이어야 합니다.');
   ensure(r.behavior.actionCount===null||r.behavior.actionCount===data.actions.actions.length,'actionCount와 actions 길이가 다릅니다.');
-  const runDir=join(root,'runs',r.runId);
-  // Stage outside runs; rename only after every file is written. Never overwrite a result.
-  try{await readFile(join(runDir,'result.json'));throw new Error('이미 기록된 runId입니다. 기존 결과를 덮어쓰지 않습니다.');}catch(e){if(e.code!=='ENOENT')throw e;}
+  ensure(!(await results()).directories.has(r.runId),'이미 기록된 runId입니다. 기존 결과를 덮어쓰지 않습니다.');
   const stage=join(stateDir,`import-${randomUUID()}`);await mkdir(stage,{recursive:true});
-  try{await writeFile(join(stage,'result.json'),JSON.stringify(r,null,2)+'\n');await writeFile(join(stage,'actions.json'),JSON.stringify(data.actions,null,2)+'\n');for(const c of captures)await writeFile(join(stage,c.name),c.bytes);await rename(stage,runDir);}catch(e){await rm(stage,{recursive:true,force:true});throw e;}
+  try{await writeFile(join(stage,'result.json'),JSON.stringify(r,null,2)+'\n');await writeFile(join(stage,'actions.json'),JSON.stringify(data.actions,null,2)+'\n');for(const c of captures)await writeFile(join(stage,c.name),c.bytes);const runDir=await destinationForImport(root,r);await mkdir(dirname(runDir),{recursive:true});await rename(stage,runDir);}catch(e){await rm(stage,{recursive:true,force:true});throw e;}
   return send(res,200,{ok:true});
  }
  return send(res,404,{error:'지원하지 않는 API입니다.'});

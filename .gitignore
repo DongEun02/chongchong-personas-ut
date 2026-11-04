@@ -37,3 +37,4 @@ raw-captures/
 
 # 로컬 실험 대기 목록·페르소나 백업
 .ai-ut/
+runs/

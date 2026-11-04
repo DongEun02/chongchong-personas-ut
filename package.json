@@ -4,7 +4,10 @@
   "type": "module",
   "scripts": {
     "start": "node manager/server.mjs",
-    "test": "node --test manager/domain.test.mjs"
+    "test": "node --test manager/*.test.mjs",
+    "organize:runs": "node manager/migrate-runs.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  }
 }

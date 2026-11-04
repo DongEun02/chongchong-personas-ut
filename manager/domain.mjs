@@ -1,9 +1,10 @@
 export const TASKS = [
   {id:'T01',title:'마감 임박 과제 찾기',role:'멤버',tag:'정보 발견',limit:'8분 · 60행동',goal:'기준 시각은 {referenceTime}, 시간대는 Asia/Seoul입니다. 기준 시각부터 72시간 이내에 마감되는, 내가 해야 하는 미제출 과제를 모두 찾아 제목과 마감 시각을 알려주세요. 과제를 제출하거나 수정할 필요는 없습니다.'},
   {id:'T02',title:'내 스터디 목록으로 이동',role:'멤버',tag:'탐색 경로',limit:'5분 · 40행동',goal:'현재 보고 있는 스터디에서 나와, 내가 가입한 스터디들을 한 번에 볼 수 있는 화면으로 이동해주세요.'},
-  {id:'T03',title:'초대 스터디의 목적과 일정 확인',role:'비가입자',tag:'가입 전 이해',limit:'8분 · 60행동',goal:'친구가 보낸 초대 링크를 열어, 이 스터디에서 무엇을 하는지와 정기 모임의 요일·시간을 알아내 알려주세요. 확인을 위해 가입해도 됩니다.'},
   {id:'T04',title:'기존 과제에 신규 멤버 포함',role:'운영자',tag:'멤버 관리',limit:'능동 15분 · 100행동',goal:'과제를 하나 만든 다음 새 멤버에게 초대 링크를 전달해주세요. 그 멤버가 가입하면, 방금 만든 기존 과제의 대상자에 포함해주세요. 기존 과제는 유지해주세요.'}
 ];
+// Retained only for reading historical records; excluded from new queues/imports.
+export const RETIRED_TASK_IDS = ['T03'];
 export function ensure(ok, message) { if (!ok) throw new Error(message); }
 export function safeId(id) { return typeof id==='string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(id); }
 export const CONDITION_FIELDS = ['webProficiency','similarServiceExperience','priorExperienceWithTargetService'];
@@ -41,7 +42,7 @@ export function validatePersonas(data) {
 export function validateResult(r) {
   for(const key of ['schemaVersion','runId','personaId','taskId','version','repeat','serviceCommit','executedAt','model','promptDelivered','status','success','terminationReason','failureCategory','timing','behavior','aiEvaluation','verification','taskSpecific','notes']) ensure(r && Object.hasOwn(r,key),`${key} 필드가 필요합니다.`);
   ensure(r && safeId(r.runId) && safeId(r.personaId),'유효한 runId와 personaId가 필요합니다.');
-  ensure(TASKS.some(t=>t.id===r.taskId) && ['current','A','B'].includes(r.version),'TASK 또는 버전이 올바르지 않습니다.');
+  ensure((TASKS.some(t=>t.id===r.taskId)||RETIRED_TASK_IDS.includes(r.taskId)) && ['current','A','B'].includes(r.version),'TASK 또는 버전이 올바르지 않습니다.');
   ensure(Number.isInteger(r.repeat) && r.repeat>0,'repeat는 1 이상의 정수여야 합니다.');
   ensure(['completed','failed','invalid'].includes(r.status),'실제로 종료된 실행만 가져올 수 있습니다.');
   ensure(r.success===(r.status==='completed'?true:r.status==='failed'?false:null),'status와 success가 일치하지 않습니다.');
@@ -73,7 +74,7 @@ export const CSV_HEADER='run_id,persona_id,task_id,version,repeat,status,success
 export function csvExport(results) {
  const cell=v=>v==null?'':`"${String(v).replaceAll('"','""')}"`;
  const sec=v=>v==null?null:v/1000;
- return CSV_HEADER+'\n'+results.map(r=>[r.runId,r.personaId,r.taskId,r.version,r.repeat,r.status,r.success,sec(r.timing.elapsedMs),sec(r.timing.modelAndToolWaitMs),sec(r.timing.externalWaitMs),r.behavior.actionCount,r.behavior.unnecessaryActionCount,r.aiEvaluation.easeScore,r.failureCategory,`runs/${r.runId}/`].map(cell).join(',')).join('\n');
+ return CSV_HEADER+'\n'+results.map(r=>[r.runId,r.personaId,r.taskId,r.version,r.repeat,r.status,r.success,sec(r.timing.elapsedMs),sec(r.timing.modelAndToolWaitMs),sec(r.timing.externalWaitMs),r.behavior.actionCount,r.behavior.unnecessaryActionCount,r.aiEvaluation.easeScore,r.failureCategory,`${r.storagePath||`runs/${r.repeat}회차/${r.taskId}/${r.version}/${r.personaId}`}/`].map(cell).join(',')).join('\n');
 }
 // Average within each persona before averaging between personas. Null is never zero.
 export function personaMean(rows,value) {
@@ -91,6 +92,7 @@ export function aggregate(rows) {
 export function createQueuedRuns(source, data, previousQueue = [], existing = []) {
   validatePersonas(source);
   ensure(Array.isArray(data.personaIds)&&data.personaIds.length&&Array.isArray(data.taskIds)&&data.taskIds.length,'페르소나와 TASK를 선택해주세요.');
+  ensure(data.taskIds.every(id=>TASKS.some(t=>t.id===id)),'실험 대상 TASK는 T01, T02, T04입니다. T03은 제외되었습니다.');
   ensure(['current','A','B'].includes(data.version),'버전 오류');
   ensure(Number.isInteger(data.repeat)&&data.repeat>=1&&data.repeat<=10,'반복 차수는 1~10입니다.');
   ensure(typeof data.serviceCommit==='string'&&data.serviceCommit.length<=100,'커밋 입력 오류');
