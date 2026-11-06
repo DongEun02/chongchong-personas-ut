@@ -77,7 +77,7 @@ export async function migrateRuns(root) {
 
 // Called only after an import has been staged and validated.
 export async function destinationForImport(root,result) {
- await migrateRuns(root);
+ // Import only touches its destination; reorganizing existing records is explicit.
  const base=join(root,runPath(result));
  if(await exists(join(base,'result.json')))await moveRecord(base,join(base,'시도-01'));
  let number=1;

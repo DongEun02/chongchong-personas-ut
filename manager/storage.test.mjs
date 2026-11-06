@@ -32,6 +32,34 @@ test('기존 기록을 정리해도 결과·행동·캡처 내용 및 CSV·조�
  assert.equal((await migrateRuns(root)).length,0);
 });
 
+test('결과 가져오기는 개선 전 등 기존 분류의 기록을 재배치하지 않는다',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'chongchong-preserve-'));
+ t.after(()=>rm(root,{recursive:true,force:true}));
+ const template=JSON.parse(await readFile(new URL('../templates/result.json',import.meta.url),'utf8'));
+ const result={...template,runId:'unit-before',personaId:'P01',repeat:3,taskId:'T02',version:'current',status:'invalid',success:null,terminationReason:'infra_error'};
+ const before=join(root,'runs','개선 전','T02','current','P01');
+ await mkdir(before,{recursive:true});
+ const contents=JSON.stringify(result);
+ await writeFile(join(before,'result.json'),contents);
+ await writeFile(join(before,'actions.json'),'[]\n');
+ await writeFile(join(before,'final.png'),Buffer.from([1,2,3]));
+ // Both an unrelated import and a retry of the manually classified result leave it in place.
+ for(const incoming of [{...result,runId:'unit-new',taskId:'T01',repeat:4},{...result,runId:'unit-retry'}]) {
+  const destination=await destinationForImport(root,incoming);
+  assert.equal(destination,join(root,runPath(incoming)));
+  await mkdir(destination,{recursive:true});
+  await writeFile(join(destination,'result.json'),JSON.stringify(incoming));
+  assert.equal(await findRunDirectory(root,result.runId),before);
+  assert.equal(await readFile(join(before,'result.json'),'utf8'),contents);
+  assert.equal(await readFile(join(before,'actions.json'),'utf8'),'[]\n');
+  assert.deepEqual(await readFile(join(before,'final.png')),Buffer.from([1,2,3]));
+ }
+ const records=await readRuns(root);
+ assert.equal(records.rows.length,3);
+ assert.deepEqual(records.warnings,[]);
+ assert.ok(csvExport(records.rows).includes('runs/개선 전/T02/current/P01/'));
+});
+
 test('저장 경로는 회차·TASK·버전·페르소나로 분리하며 경로 조작을 거부한다',()=>{
  const r={repeat:1,taskId:'T02',version:'current',personaId:'P01',runId:'unit'};
  assert.equal(runPath(r),'runs/1회차/T02/current/P01');
